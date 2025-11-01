@@ -1,0 +1,165 @@
+# Lazy_Bird - Game Development Automation System
+# .gitignore file
+
+# ============================================
+# Secrets & Configuration
+# ============================================
+# Never commit API keys, tokens, or credentials
+secrets/
+*.key
+*.pem
+api_token
+claude_key
+vpn_key
+.env
+.env.local
+
+# Lazy_Bird specific secret storage
+.config/lazy_birtd/secrets/
+
+# ============================================
+# Python
+# ============================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+ENV/
+env/
+.venv
+
+# ============================================
+# Logs & Temporary Files
+# ============================================
+*.log
+logs/
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Lazy_Bird runtime data
+/var/lib/lazy_birtd/
+/tmp/agents/
+agent-*.log
+task-*.log
+
+# ============================================
+# Godot
+# ============================================
+# Godot-specific ignores (for test projects)
+.import/
+.godot/
+export.cfg
+export_presets.cfg
+
+# Godot mono builds
+.mono/
+data_*/
+mono_crash.*.json
+
+# ============================================
+# Git & Version Control
+# ============================================
+# Git worktrees created by agents
+/tmp/agent-*/
+
+# ============================================
+# IDE & Editor
+# ============================================
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+.project
+.classpath
+.settings/
+
+# ============================================
+# OS-Specific
+# ============================================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+.directory
+.Trash-*
+
+# ============================================
+# Docker
+# ============================================
+*.dockerignore
+docker-compose.override.yml
+
+# ============================================
+# Testing & Coverage
+# ============================================
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+junit.xml
+coverage.xml
+
+# ============================================
+# Build Artifacts
+# ============================================
+*.o
+*.a
+*.so
+*.exe
+*.dll
+
+# ============================================
+# Backup Files
+# ============================================
+*.bak
+*.backup
+*.old
+*~
+
+# ============================================
+# Lazy_Bird Specific
+# ============================================
+# Task queue files
+queue/*.json
+
+# Test artifacts
+test-output/
+validation-*.log
+
+# Agent working directories (git worktrees)
+worktrees/
+
+# Temporary Godot installations
+/tmp/gdUnit4-temp/
