@@ -1,0 +1,69 @@
+# Lazy_Bird Configuration File
+# Copy to ~/.config/lazy_birtd/config.yml and customize
+
+# Git Platform (github or gitlab)
+git_platform: github
+
+# Repository URL or path
+# GitHub: https://github.com/owner/repo or owner/repo
+# GitLab: https://gitlab.com/owner/repo or owner/repo
+repository: https://github.com/yourusername/your-godot-game
+
+# GitLab only: Project ID (optional, will be auto-detected if not provided)
+# project_id: 12345678
+
+# Issue polling interval in seconds (default: 60)
+poll_interval_seconds: 60
+
+# Godot project path (where your project.godot file is)
+godot_project_path: /home/yourusername/my-godot-game
+
+# Phase configuration (1-6)
+# Phase 1: Single agent, sequential processing
+# Phase 2: Multi-agent with coordination
+# Phase 3: Remote access + monitoring
+# Phase 4-6: Advanced features
+phase: 1
+
+# Resource limits
+max_concurrent_agents: 1  # Phase 1: always 1
+memory_limit_gb: 8        # RAM limit per agent
+
+# Task complexity limits (for Phase 2+)
+task_limits:
+  simple:
+    max_parallel: 3
+    memory_gb: 2
+  medium:
+    max_parallel: 2
+    memory_gb: 3
+  complex:
+    max_parallel: 1
+    memory_gb: 5
+
+# Retry configuration
+retry:
+  max_attempts: 3
+  max_cost_per_task_usd: 5.0
+  daily_budget_limit_usd: 50.0
+
+# Notifications (Phase 3+)
+# notifications:
+#   enabled: false
+#   ntfy_topic: your-unique-topic
+#   webhook_url: https://your-webhook.example.com
+
+# Dashboard (Phase 3+)
+# dashboard:
+#   enabled: false
+#   host: 127.0.0.1
+#   port: 5000
+#   auth: basic
+#   username: admin
+#   password_hash: your-bcrypt-hash
+
+# VPN (Phase 3+)
+# vpn:
+#   enabled: false
+#   interface: wg0
+#   subnet: 10.0.0.0/24
