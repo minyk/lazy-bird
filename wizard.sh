@@ -30,8 +30,8 @@ show_logo() {
 
 EOF
     echo -e "${NC}"
-    echo -e "${MAGENTA}    Automate game dev while you sleep 🦜💤${NC}"
-    echo -e "${BLUE}    Setup Wizard v1.0${NC}"
+    echo -e "${MAGENTA}    Automate development while you sleep 🦜💤${NC}"
+    echo -e "${BLUE}    Setup Wizard v2.0${NC}"
     echo ""
 }
 
@@ -61,6 +61,71 @@ info() {
     echo -e "${BLUE}ℹ${NC} $1"
 }
 
+# Load framework preset from config/framework-presets.yml
+load_framework_preset() {
+    local framework_id=$1
+    local presets_file="$(dirname "${BASH_SOURCE[0]}")/config/framework-presets.yml"
+
+    if [ ! -f "$presets_file" ]; then
+        warning "Framework presets file not found: $presets_file"
+        return 1
+    fi
+
+    # Parse YAML using Python and export variables
+    eval $(python3 -c "
+import yaml
+import sys
+
+try:
+    with open('$presets_file') as f:
+        presets = yaml.safe_load(f)
+        preset = presets.get('presets', {}).get('$framework_id')
+
+        if not preset:
+            print('PRESET_FOUND=false', file=sys.stderr)
+            sys.exit(1)
+
+        # Export commands (handle null values)
+        test_cmd = preset.get('test_command', 'null')
+        build_cmd = preset.get('build_command', 'null')
+        lint_cmd = preset.get('lint_command', 'null')
+        format_cmd = preset.get('format_command', 'null')
+
+        # Quote strings properly for bash
+        if test_cmd and test_cmd != 'null':
+            print(f\"TEST_COMMAND='{test_cmd}'\")
+        else:
+            print('TEST_COMMAND=null')
+
+        if build_cmd and build_cmd != 'null':
+            print(f\"BUILD_COMMAND='{build_cmd}'\")
+        else:
+            print('BUILD_COMMAND=null')
+
+        if lint_cmd and lint_cmd != 'null':
+            print(f\"LINT_COMMAND='{lint_cmd}'\")
+        else:
+            print('LINT_COMMAND=null')
+
+        if format_cmd and format_cmd != 'null':
+            print(f\"FORMAT_COMMAND='{format_cmd}'\")
+        else:
+            print('FORMAT_COMMAND=null')
+
+        print('PRESET_FOUND=true')
+
+except Exception as e:
+    print(f'PRESET_FOUND=false', file=sys.stderr)
+    sys.exit(1)
+" 2>&1)
+
+    if [ "${PRESET_FOUND:-false}" != "true" ]; then
+        return 1
+    fi
+
+    return 0
+}
+
 # Main wizard function
 main() {
     clear
@@ -68,12 +133,12 @@ main() {
 
     section "Welcome to Lazy_Bird Setup Wizard"
 
-    echo "This wizard will help you set up automated game development with Claude Code."
+    echo "This wizard will help you set up automated development with Claude Code."
     echo ""
     echo "What the wizard does:"
     echo "  ${GREEN}✓${NC} Validates your system (Phase 0)"
-    echo "  ${GREEN}✓${NC} Detects capabilities (RAM, Godot, Claude CLI)"
-    echo "  ${GREEN}✓${NC} Asks 8 simple questions"
+    echo "  ${GREEN}✓${NC} Detects capabilities (RAM, Claude CLI, Git)"
+    echo "  ${GREEN}✓${NC} Asks 9 simple questions"
     echo "  ${GREEN}✓${NC} Installs appropriate phase automatically"
     echo "  ${GREEN}✓${NC} Configures all services"
     echo "  ${GREEN}✓${NC} Runs a test task to verify"
@@ -195,8 +260,123 @@ main() {
     echo "Please answer the following questions to configure your system."
     echo ""
 
-    # Question 1: Project Location
-    read -p "❓ [1/8] Enter your Godot project path: " PROJECT_PATH
+    # Question 1: Project Type Category
+    echo "❓ [1/9] What type of project are you working on?"
+    echo "  1) Game Engine"
+    echo "  2) Backend Framework"
+    echo "  3) Frontend Framework"
+    echo "  4) Programming Language (General)"
+    echo "  5) Custom (manual configuration)"
+    read -p "Select [1-5]: " PROJECT_CATEGORY_CHOICE
+
+    # Question 1b: Specific Framework (based on category)
+    FRAMEWORK_TYPE=""
+    TEST_COMMAND="null"
+    BUILD_COMMAND="null"
+    LINT_COMMAND="null"
+    FORMAT_COMMAND="null"
+
+    case "$PROJECT_CATEGORY_CHOICE" in
+        1) # Game Engine
+            echo ""
+            echo "❓ [1b/9] Which game engine?"
+            echo "  1) Godot (GDScript, gdUnit4)"
+            echo "  2) Unity (C#, NUnit)"
+            echo "  3) Unreal Engine (C++, Automation)"
+            echo "  4) Bevy (Rust, cargo test)"
+            echo "  5) Other (manual config)"
+            read -p "Select [1-5]: " FRAMEWORK_CHOICE
+
+            case "$FRAMEWORK_CHOICE" in
+                1) FRAMEWORK_TYPE="godot" ;;
+                2) FRAMEWORK_TYPE="unity" ;;
+                3) FRAMEWORK_TYPE="unreal" ;;
+                4) FRAMEWORK_TYPE="bevy" ;;
+                *) FRAMEWORK_TYPE="custom" ;;
+            esac
+            ;;
+        2) # Backend Framework
+            echo ""
+            echo "❓ [1b/9] Which backend framework?"
+            echo "  1) Django (Python)"
+            echo "  2) Flask (Python)"
+            echo "  3) FastAPI (Python)"
+            echo "  4) Express (Node.js)"
+            echo "  5) Rails (Ruby)"
+            echo "  6) Other (manual config)"
+            read -p "Select [1-6]: " FRAMEWORK_CHOICE
+
+            case "$FRAMEWORK_CHOICE" in
+                1) FRAMEWORK_TYPE="django" ;;
+                2) FRAMEWORK_TYPE="flask" ;;
+                3) FRAMEWORK_TYPE="fastapi" ;;
+                4) FRAMEWORK_TYPE="express" ;;
+                5) FRAMEWORK_TYPE="rails" ;;
+                *) FRAMEWORK_TYPE="custom" ;;
+            esac
+            ;;
+        3) # Frontend Framework
+            echo ""
+            echo "❓ [1b/9] Which frontend framework?"
+            echo "  1) React (JavaScript/TypeScript)"
+            echo "  2) Vue.js (JavaScript/TypeScript)"
+            echo "  3) Angular (TypeScript)"
+            echo "  4) Svelte (JavaScript/TypeScript)"
+            echo "  5) Other (manual config)"
+            read -p "Select [1-5]: " FRAMEWORK_CHOICE
+
+            case "$FRAMEWORK_CHOICE" in
+                1) FRAMEWORK_TYPE="react" ;;
+                2) FRAMEWORK_TYPE="vue" ;;
+                3) FRAMEWORK_TYPE="angular" ;;
+                4) FRAMEWORK_TYPE="svelte" ;;
+                *) FRAMEWORK_TYPE="custom" ;;
+            esac
+            ;;
+        4) # Programming Language
+            echo ""
+            echo "❓ [1b/9] Which programming language?"
+            echo "  1) Python (pytest)"
+            echo "  2) Rust (cargo)"
+            echo "  3) Go (go test)"
+            echo "  4) Node.js (Jest)"
+            echo "  5) C/C++ (make)"
+            echo "  6) Java (Maven)"
+            echo "  7) Other (manual config)"
+            read -p "Select [1-7]: " FRAMEWORK_CHOICE
+
+            case "$FRAMEWORK_CHOICE" in
+                1) FRAMEWORK_TYPE="python" ;;
+                2) FRAMEWORK_TYPE="rust" ;;
+                3) FRAMEWORK_TYPE="go" ;;
+                4) FRAMEWORK_TYPE="nodejs" ;;
+                5) FRAMEWORK_TYPE="cpp" ;;
+                6) FRAMEWORK_TYPE="java" ;;
+                *) FRAMEWORK_TYPE="custom" ;;
+            esac
+            ;;
+        *) # Custom
+            FRAMEWORK_TYPE="custom"
+            warning "Custom configuration selected - you'll need to manually configure test/build commands"
+            ;;
+    esac
+
+    # Load framework preset if not custom
+    if [ "$FRAMEWORK_TYPE" != "custom" ]; then
+        info "Loading $FRAMEWORK_TYPE preset..."
+        if load_framework_preset "$FRAMEWORK_TYPE"; then
+            success "Framework preset loaded: $FRAMEWORK_TYPE"
+        else
+            warning "Failed to load preset for $FRAMEWORK_TYPE, using manual config"
+            FRAMEWORK_TYPE="custom"
+        fi
+    fi
+
+    success "Project type: $FRAMEWORK_TYPE"
+    echo ""
+
+    # Question 2: Project Location
+    read -p "❓ [2/9] Enter your project path: " PROJECT_PATH
     PROJECT_PATH="${PROJECT_PATH/#\~/$HOME}"
 
     if [ ! -d "$PROJECT_PATH" ]; then
@@ -212,8 +392,8 @@ main() {
     success "Project path: $PROJECT_PATH"
     echo ""
 
-    # Question 2: Git Platform
-    echo "❓ [2/8] Which git platform are you using?"
+    # Question 3: Git Platform
+    echo "❓ [3/9] Which git platform are you using?"
     echo "  1) GitHub"
     echo "  2) GitLab"
     read -p "Select [1-2]: " GIT_PLATFORM_CHOICE
@@ -234,13 +414,13 @@ main() {
     success "Platform: $GIT_PLATFORM"
     echo ""
 
-    # Question 3: Repository Details
-    read -p "❓ [3/8] Enter your repository URL: " REPOSITORY
+    # Question 4: Repository Details
+    read -p "❓ [4/9] Enter your repository URL: " REPOSITORY
     success "Repository: $REPOSITORY"
     echo ""
 
-    # Question 4: API Token
-    read -sp "❓ [4/8] Enter your $GIT_PLATFORM API token (input hidden): " API_TOKEN
+    # Question 5: API Token
+    read -sp "❓ [5/9] Enter your $GIT_PLATFORM API token (input hidden): " API_TOKEN
     echo ""
 
     if [ -z "$API_TOKEN" ]; then
@@ -251,33 +431,8 @@ main() {
     success "API token received (will be stored securely)"
     echo ""
 
-    # Question 5: Testing Framework
-    echo "❓ [5/8] Which testing framework?"
-    echo "  1) gdUnit4 (recommended)"
-    echo "  2) GUT"
-    echo "  3) None (skip tests)"
-    read -p "Select [1-3]: " TEST_FRAMEWORK_CHOICE
-
-    case "$TEST_FRAMEWORK_CHOICE" in
-        1)
-            TEST_FRAMEWORK="gdUnit4"
-            ;;
-        2)
-            TEST_FRAMEWORK="GUT"
-            ;;
-        3)
-            TEST_FRAMEWORK="none"
-            ;;
-        *)
-            TEST_FRAMEWORK="gdUnit4"
-            ;;
-    esac
-
-    success "Test framework: $TEST_FRAMEWORK"
-    echo ""
-
     # Question 6: Notifications
-    echo "❓ [6/8] Enable notifications?"
+    echo "❓ [6/9] Enable notifications?"
     echo "  1) Yes, via ntfy.sh (recommended)"
     echo "  2) No notifications"
     read -p "Select [1-2]: " NOTIFICATIONS_CHOICE
@@ -297,7 +452,7 @@ main() {
     echo ""
 
     # Question 7: Resource Allocation
-    read -p "❓ [7/8] Maximum RAM per agent in GB [default: 10]: " MAX_RAM
+    read -p "❓ [7/9] Maximum RAM per agent in GB [default: 10]: " MAX_RAM
     MAX_RAM="${MAX_RAM:-10}"
 
     if ! [[ "$MAX_RAM" =~ ^[0-9]+$ ]]; then
@@ -309,7 +464,7 @@ main() {
     echo ""
 
     # Question 8: Starting Phase
-    echo "❓ [8/8] Starting Phase:"
+    echo "❓ [8/9] Starting Phase:"
     echo "  Phase 1: Single Agent Sequential (recommended for initial setup)"
     PHASE=1
     success "Phase: $PHASE"
@@ -331,17 +486,29 @@ main() {
 # Lazy_Bird Configuration
 # Generated by wizard on $(date)
 
+# Project Configuration
+project:
+  type: $FRAMEWORK_TYPE
+  name: "My Project"
+  path: $PROJECT_PATH
+
+# Framework Commands
+test_command: $TEST_COMMAND
+build_command: $BUILD_COMMAND
+lint_command: $LINT_COMMAND
+format_command: $FORMAT_COMMAND
+
+# Git Configuration
 git_platform: $GIT_PLATFORM
 repository: $REPOSITORY
-godot_project_path: $PROJECT_PATH
 poll_interval_seconds: 60
 
+# Phase Configuration
 phase: $PHASE
 max_concurrent_agents: 1
-agent_max_ram_gb: $MAX_RAM
+memory_limit_gb: $MAX_RAM
 
-test_framework: $TEST_FRAMEWORK
-
+# Notifications
 notifications:
   enabled: $NOTIFICATIONS_ENABLED
   method: $([ "$NOTIFICATIONS_ENABLED" = true ] && echo "ntfy" || echo "none")
@@ -622,9 +789,13 @@ cmd_health() {
     fi
 
     # Check 9: Project path
-    echo -n "Godot project path... "
+    echo -n "Project path... "
     if [ -f "$HOME/.config/lazy_birtd/config.yml" ]; then
-        PROJECT_PATH=$(grep "godot_project_path:" "$HOME/.config/lazy_birtd/config.yml" | awk '{print $2}')
+        # Try new schema first (project.path), fallback to old schema (godot_project_path)
+        PROJECT_PATH=$(grep "path:" "$HOME/.config/lazy_birtd/config.yml" | grep -v "^#" | head -1 | awk '{print $2}')
+        if [ -z "$PROJECT_PATH" ]; then
+            PROJECT_PATH=$(grep "godot_project_path:" "$HOME/.config/lazy_birtd/config.yml" | awk '{print $2}')
+        fi
         if [ -d "$PROJECT_PATH" ]; then
             echo -e "${GREEN}✓${NC}"
             ((CHECKS_PASSED++))
