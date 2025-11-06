@@ -13,6 +13,15 @@ MAGENTA='\033[0;35m'
 CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
+# Phase 1.1: Multi-project support
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -f "$SCRIPT_DIR/scripts/wizard-multi-project.sh" ]; then
+    source "$SCRIPT_DIR/scripts/wizard-multi-project.sh"
+fi
+
+# Phase 1.1: Projects array for multi-project configuration
+declare -a PROJECTS
+
 # ASCII Art Logo
 show_logo() {
     echo -e "${CYAN}"
@@ -867,6 +876,23 @@ case "${1:-}" in
         section "Weekly Review"
         info "Weekly review will be implemented in next version"
         ;;
+    --add-project)
+        show_logo
+        section "Add New Project"
+        echo "This will add a project to your existing Lazy_Bird configuration."
+        echo ""
+        if [ -f "$HOME/.config/lazy_birtd/config.yml" ]; then
+            if type -t add_project_to_config > /dev/null 2>&1; then
+                add_project_to_config
+            else
+                error "Multi-project functions not loaded. Please reinstall Lazy_Bird."
+                exit 1
+            fi
+        else
+            error "No existing configuration found. Run ./wizard.sh first."
+            exit 1
+        fi
+        ;;
     --help)
         show_logo
         section "Lazy_Bird Wizard Help"
@@ -874,6 +900,7 @@ case "${1:-}" in
         echo ""
         echo "Commands:"
         echo "  (no args)        - Run setup wizard"
+        echo "  --add-project    - Add project to existing setup (Phase 1.1+)"
         echo "  --status         - Show system status"
         echo "  --health         - Run health checks"
         echo "  --upgrade        - Upgrade to next phase"

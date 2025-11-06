@@ -131,6 +131,7 @@ parse_task() {
         exit 2
     fi
 
+    # Basic task fields
     TASK_ID=$(jq -r '.issue_id' "$task_file")
     TASK_TITLE=$(jq -r '.title' "$task_file")
     TASK_BODY=$(jq -r '.body' "$task_file")
@@ -138,9 +139,26 @@ parse_task() {
     TASK_URL=$(jq -r '.url' "$task_file")
     TASK_REPOSITORY=$(jq -r '.repository' "$task_file")
 
+    # Phase 1.1: Project context
+    PROJECT_ID=$(jq -r '.project_id // "default"' "$task_file")
+    PROJECT_NAME=$(jq -r '.project_name // "Default Project"' "$task_file")
+    PROJECT_TYPE=$(jq -r '.project_type // "unknown"' "$task_file")
+    TASK_PROJECT_PATH=$(jq -r '.project_path // ""' "$task_file")
+
+    # Phase 1.1: Project-specific commands (from task, not config)
+    TASK_TEST_CMD=$(jq -r '.test_command // ""' "$task_file")
+    TASK_BUILD_CMD=$(jq -r '.build_command // ""' "$task_file")
+    TASK_LINT_CMD=$(jq -r '.lint_command // ""' "$task_file")
+
     if [ -z "$TASK_ID" ] || [ "$TASK_ID" = "null" ]; then
         log_error "Invalid task file: missing issue_id"
         exit 2
+    fi
+
+    # Phase 1.1: If task has project_path, use it directly (overrides config)
+    if [ -n "$TASK_PROJECT_PATH" ] && [ "$TASK_PROJECT_PATH" != "null" ]; then
+        PROJECT_PATH="$TASK_PROJECT_PATH"
+        log_info "Using project path from task: $PROJECT_PATH"
     fi
 
     # Extract owner/repo from repository URL
@@ -151,8 +169,9 @@ parse_task() {
         REPO_NAME=$(echo "$REPOSITORY" | sed -E 's|https?://github.com/||' | sed 's|\.git$||')
     fi
 
-    log_info "Task #$TASK_ID: $TASK_TITLE"
-    log_info "Complexity: $TASK_COMPLEXITY"
+    log_info "[$PROJECT_ID] Task #$TASK_ID: $TASK_TITLE"
+    log_info "[$PROJECT_ID] Project: $PROJECT_NAME ($PROJECT_TYPE)"
+    log_info "[$PROJECT_ID] Complexity: $TASK_COMPLEXITY"
 }
 
 # Update issue labels: in-queue → in-process
@@ -185,42 +204,46 @@ update_labels_to_review() {
 
 # Create worktree
 create_worktree() {
-    BRANCH_NAME="feature-$TASK_ID"
-    WORKTREE_PATH="/tmp/lazy-bird-agent-$TASK_ID"
+    # Phase 1.1: Include project-id in branch and worktree names
+    BRANCH_NAME="feature-$PROJECT_ID-$TASK_ID"
+    WORKTREE_PATH="/tmp/lazy-bird-agent-$PROJECT_ID-$TASK_ID"
 
-    log_info "Creating worktree: $WORKTREE_PATH"
+    log_info "[$PROJECT_ID] Creating worktree: $WORKTREE_PATH"
 
     cd "$PROJECT_PATH" || exit 3
 
     # Clean up existing worktree if it exists
     if [ -d "$WORKTREE_PATH" ]; then
-        log_warning "Worktree already exists, removing: $WORKTREE_PATH"
+        log_warning "[$PROJECT_ID] Worktree already exists, removing: $WORKTREE_PATH"
         git worktree remove "$WORKTREE_PATH" --force 2>/dev/null || rm -rf "$WORKTREE_PATH"
     fi
 
     # Check if branch exists (might be left over from previous run)
     if git show-ref --verify --quiet refs/heads/"$BRANCH_NAME"; then
-        log_warning "Branch already exists, deleting: $BRANCH_NAME"
+        log_warning "[$PROJECT_ID] Branch already exists, deleting: $BRANCH_NAME"
         git branch -D "$BRANCH_NAME" 2>/dev/null || true
     fi
 
     # Create new worktree with new branch
     if git worktree add -b "$BRANCH_NAME" "$WORKTREE_PATH" HEAD; then
-        log_success "Worktree created successfully"
+        log_success "[$PROJECT_ID] Worktree created successfully"
     else
-        log_error "Failed to create worktree"
+        log_error "[$PROJECT_ID] Failed to create worktree"
         exit 3
     fi
 }
 
 # Run Claude Code
 run_claude() {
-    log_info "Running Claude Code on task..."
+    log_info "[$PROJECT_ID] Running Claude Code on task..."
 
     cd "$WORKTREE_PATH" || exit 3
 
-    # Prepare prompt
-    CLAUDE_PROMPT="TASK: $TASK_TITLE
+    # Prepare prompt (Phase 1.1: include project context)
+    CLAUDE_PROMPT="PROJECT: $PROJECT_NAME ($PROJECT_TYPE)
+PROJECT ID: $PROJECT_ID
+
+TASK: $TASK_TITLE
 
 DETAILS:
 $TASK_BODY
@@ -235,14 +258,15 @@ Work in the current directory: $WORKTREE_PATH
 
 **DO NOT use git commit** - just make the file changes. The automation will commit and push."
 
-    # Create log file
+    # Create log file (Phase 1.1: include project-id in filename)
     LOG_DIR="${LAZY_BIRD_LOG_DIR:-$HOME/.config/lazy_birtd/logs}"
     mkdir -p "$LOG_DIR"
-    LOG_FILE="$LOG_DIR/agent-task-$TASK_ID.log"
+    LOG_FILE="$LOG_DIR/agent-$PROJECT_ID-task-$TASK_ID.log"
 
-    log_info "Logging to: $LOG_FILE"
-    echo "=== Agent Task #$TASK_ID ===" > "$LOG_FILE"
+    log_info "[$PROJECT_ID] Logging to: $LOG_FILE"
+    echo "=== Agent Task #$TASK_ID (Project: $PROJECT_ID) ===" > "$LOG_FILE"
     echo "Started: $(date)" >> "$LOG_FILE"
+    echo "Project: $PROJECT_NAME ($PROJECT_TYPE)" >> "$LOG_FILE"
     echo "Task: $TASK_TITLE" >> "$LOG_FILE"
     echo "Worktree: $WORKTREE_PATH" >> "$LOG_FILE"
     echo "" >> "$LOG_FILE"
@@ -250,17 +274,17 @@ Work in the current directory: $WORKTREE_PATH
     # Run Claude with safety restrictions
     # Use --allowedTools to restrict what Claude can do
     # Don't use --dangerously-skip-permissions unless in container
-    log_info "Executing Claude Code CLI..."
+    log_info "[$PROJECT_ID] Executing Claude Code CLI..."
 
     if claude -p "$CLAUDE_PROMPT" \
         --allowedTools "Read,Write,Edit,Glob,Grep,Bash(git:*)" \
         2>&1 | tee -a "$LOG_FILE"; then
 
         CLAUDE_EXIT=0
-        log_success "Claude completed successfully"
+        log_success "[$PROJECT_ID] Claude completed successfully"
     else
         CLAUDE_EXIT=$?
-        log_error "Claude failed with exit code: $CLAUDE_EXIT"
+        log_error "[$PROJECT_ID] Claude failed with exit code: $CLAUDE_EXIT"
         echo "" >> "$LOG_FILE"
         echo "Failed: $(date)" >> "$LOG_FILE"
         echo "Exit code: $CLAUDE_EXIT" >> "$LOG_FILE"
@@ -302,28 +326,26 @@ check_changes() {
 
 # Run lint command (optional)
 run_lint() {
-    log_info "Running lint (if configured)..."
+    log_info "[$PROJECT_ID] Running lint (if configured)..."
 
-    local config_file="${LAZY_BIRD_CONFIG:-$HOME/.config/lazy_birtd/config.yml}"
-
-    # Read lint command from config
-    LINT_CMD=$(grep "^lint_command:" "$config_file" | sed 's/lint_command: *//' | tr -d '"' || echo "")
+    # Phase 1.1: Use lint command from task (not config)
+    local LINT_CMD="$TASK_LINT_CMD"
 
     if [ -z "$LINT_CMD" ] || [ "$LINT_CMD" = "null" ]; then
-        log_info "No lint command configured, skipping linting"
+        log_info "[$PROJECT_ID] No lint command configured, skipping linting"
         return 0
     fi
 
-    log_info "Lint command: $LINT_CMD"
+    log_info "[$PROJECT_ID] Lint command: $LINT_CMD"
 
     cd "$WORKTREE_PATH" || exit 3
 
     # Execute lint
     if eval "$LINT_CMD" > "$LOG_DIR/lint-output.log" 2>&1; then
-        log_success "Lint passed"
+        log_success "[$PROJECT_ID] Lint passed"
         return 0
     else
-        log_warning "Lint failed (continuing anyway)"
+        log_warning "[$PROJECT_ID] Lint failed (continuing anyway)"
         cat "$LOG_DIR/lint-output.log"
         return 0  # Don't fail build on lint errors
     fi
@@ -331,28 +353,26 @@ run_lint() {
 
 # Run test command
 run_tests() {
-    log_info "Running tests..."
+    log_info "[$PROJECT_ID] Running tests..."
 
-    local config_file="${LAZY_BIRD_CONFIG:-$HOME/.config/lazy_birtd/config.yml}"
-
-    # Read test command from config
-    TEST_CMD=$(grep "^test_command:" "$config_file" | sed 's/test_command: *//' | tr -d '"' || echo "")
+    # Phase 1.1: Use test command from task (not config)
+    local TEST_CMD="$TASK_TEST_CMD"
 
     if [ -z "$TEST_CMD" ] || [ "$TEST_CMD" = "null" ]; then
-        log_warning "No test command configured, skipping tests"
+        log_warning "[$PROJECT_ID] No test command configured, skipping tests"
         return 0
     fi
 
-    log_info "Test command: $TEST_CMD"
+    log_info "[$PROJECT_ID] Test command: $TEST_CMD"
 
     cd "$WORKTREE_PATH" || exit 3
 
     # Execute tests
     if eval "$TEST_CMD" > "$LOG_DIR/test-output.log" 2>&1; then
-        log_success "Tests passed"
+        log_success "[$PROJECT_ID] Tests passed"
         return 0
     else
-        log_error "Tests failed"
+        log_error "[$PROJECT_ID] Tests failed"
         cat "$LOG_DIR/test-output.log"
         return 1
     fi
@@ -360,28 +380,26 @@ run_tests() {
 
 # Run build command (optional)
 run_build() {
-    log_info "Running build (if configured)..."
+    log_info "[$PROJECT_ID] Running build (if configured)..."
 
-    local config_file="${LAZY_BIRD_CONFIG:-$HOME/.config/lazy_birtd/config.yml}"
-
-    # Read build command from config
-    BUILD_CMD=$(grep "^build_command:" "$config_file" | sed 's/build_command: *//' | tr -d '"' || echo "")
+    # Phase 1.1: Use build command from task (not config)
+    local BUILD_CMD="$TASK_BUILD_CMD"
 
     if [ -z "$BUILD_CMD" ] || [ "$BUILD_CMD" = "null" ]; then
-        log_info "No build command configured, skipping build"
+        log_info "[$PROJECT_ID] No build command configured, skipping build"
         return 0
     fi
 
-    log_info "Build command: $BUILD_CMD"
+    log_info "[$PROJECT_ID] Build command: $BUILD_CMD"
 
     cd "$WORKTREE_PATH" || exit 3
 
     # Execute build
     if eval "$BUILD_CMD" > "$LOG_DIR/build-output.log" 2>&1; then
-        log_success "Build succeeded"
+        log_success "[$PROJECT_ID] Build succeeded"
         return 0
     else
-        log_error "Build failed"
+        log_error "[$PROJECT_ID] Build failed"
         cat "$LOG_DIR/build-output.log"
         return 1
     fi
@@ -389,18 +407,19 @@ run_build() {
 
 # Commit changes
 commit_changes() {
-    log_info "Committing changes..."
+    log_info "[$PROJECT_ID] Committing changes..."
 
     cd "$WORKTREE_PATH" || exit 3
 
     # Stage all changes
     git add -A
 
-    # Create commit message
-    COMMIT_MESSAGE="Task #$TASK_ID: $TASK_TITLE
+    # Create commit message (Phase 1.1: include project context)
+    COMMIT_MESSAGE="[$PROJECT_ID] Task #$TASK_ID: $TASK_TITLE
 
 Automated implementation by Lazy_Bird agent
 
+Project: $PROJECT_NAME ($PROJECT_TYPE)
 Task URL: $TASK_URL
 Complexity: $TASK_COMPLEXITY
 
@@ -409,17 +428,17 @@ https://github.com/yusufkaraaslan/lazy-bird"
 
     # Commit
     if git commit -m "$COMMIT_MESSAGE"; then
-        log_success "Changes committed"
+        log_success "[$PROJECT_ID] Changes committed"
         return 0
     else
-        log_error "Failed to commit changes"
+        log_error "[$PROJECT_ID] Failed to commit changes"
         return 1
     fi
 }
 
 # Push branch
 push_branch() {
-    log_info "Pushing branch to remote..."
+    log_info "[$PROJECT_ID] Pushing branch to remote..."
 
     cd "$WORKTREE_PATH" || exit 3
 
@@ -427,29 +446,31 @@ push_branch() {
     REMOTE=$(git remote | head -1)
 
     if [ -z "$REMOTE" ]; then
-        log_error "No git remote configured"
+        log_error "[$PROJECT_ID] No git remote configured"
         return 1
     fi
 
     # Push branch
     if git push -u "$REMOTE" "$BRANCH_NAME"; then
-        log_success "Branch pushed: $BRANCH_NAME"
+        log_success "[$PROJECT_ID] Branch pushed: $BRANCH_NAME"
         return 0
     else
-        log_error "Failed to push branch"
+        log_error "[$PROJECT_ID] Failed to push branch"
         return 1
     fi
 }
 
 # Create pull request
 create_pr() {
-    log_info "Creating pull request..."
+    log_info "[$PROJECT_ID] Creating pull request..."
 
     cd "$WORKTREE_PATH" || exit 3
 
-    # Prepare PR body
+    # Prepare PR body (Phase 1.1: include project context)
     PR_BODY="## Automated Task Implementation
 
+**Project**: $PROJECT_NAME ($PROJECT_TYPE)
+**Project ID**: $PROJECT_ID
 **Task**: #$TASK_ID - $TASK_TITLE
 **Complexity**: $TASK_COMPLEXITY
 **Original Issue**: $TASK_URL
@@ -471,7 +492,7 @@ Please review the changes and test:
 
 ### Logs
 
-View agent logs: \`~/.config/lazy_birtd/logs/agent-task-$TASK_ID.log\`
+View agent logs: \`~/.config/lazy_birtd/logs/agent-$PROJECT_ID-task-$TASK_ID.log\`
 
 ---
 
@@ -483,14 +504,14 @@ https://github.com/yusufkaraaslan/lazy-bird"
 
     # Create PR using gh CLI
     if gh pr create \
-        --title "Task #$TASK_ID: $TASK_TITLE" \
+        --title "[$PROJECT_ID] Task #$TASK_ID: $TASK_TITLE" \
         --body "$PR_BODY" \
         --base main \
         --head "$BRANCH_NAME" \
         --label "automated"; then
 
         PR_URL=$(gh pr view "$BRANCH_NAME" --json url -q '.url')
-        log_success "Pull request created: $PR_URL"
+        log_success "[$PROJECT_ID] Pull request created: $PR_URL"
 
         # Comment on original issue with PR link
         if [ -n "$TASK_URL" ]; then
@@ -502,23 +523,31 @@ Pull request created: $PR_URL
 
 The agent has completed the implementation. Please review the PR and merge if satisfied.
 
-View logs: \`~/.config/lazy_birtd/logs/agent-task-$TASK_ID.log\`"
+View logs: \`~/.config/lazy_birtd/logs/agent-$PROJECT_ID-task-$TASK_ID.log\`"
             fi
         fi
 
         return 0
     else
-        log_error "Failed to create pull request"
+        log_error "[$PROJECT_ID] Failed to create pull request"
         return 1
     fi
 }
 
 # Cleanup worktree
 cleanup_worktree() {
-    log_info "Cleaning up worktree..."
+    # Use PROJECT_ID if set, otherwise use generic message
+    local prefix="${PROJECT_ID:+[$PROJECT_ID] }"
 
-    if [ -z "$WORKTREE_PATH" ]; then
-        log_warning "WORKTREE_PATH not set, skipping cleanup"
+    log_info "${prefix}Cleaning up worktree..."
+
+    if [ -z "${WORKTREE_PATH:-}" ]; then
+        log_warning "${prefix}WORKTREE_PATH not set, skipping cleanup"
+        return 0
+    fi
+
+    if [ -z "${PROJECT_PATH:-}" ]; then
+        log_warning "${prefix}PROJECT_PATH not set, skipping cleanup"
         return 0
     fi
 
@@ -526,16 +555,16 @@ cleanup_worktree() {
 
     # Remove worktree
     if git worktree remove "$WORKTREE_PATH" --force 2>/dev/null; then
-        log_success "Worktree removed: $WORKTREE_PATH"
+        log_success "${prefix}Worktree removed: $WORKTREE_PATH"
     else
         # Fallback: force remove directory
-        log_warning "git worktree remove failed, forcing directory removal"
+        log_warning "${prefix}git worktree remove failed, forcing directory removal"
         if rm -rf "$WORKTREE_PATH"; then
-            log_success "Worktree directory removed"
+            log_success "${prefix}Worktree directory removed"
             git worktree prune
         else
-            log_error "Failed to remove worktree directory: $WORKTREE_PATH"
-            log_error "Manual cleanup required: rm -rf $WORKTREE_PATH"
+            log_error "${prefix}Failed to remove worktree directory: $WORKTREE_PATH"
+            log_error "${prefix}Manual cleanup required: rm -rf $WORKTREE_PATH"
             return 1
         fi
     fi
@@ -567,11 +596,16 @@ main() {
     log_info "Step 1/11: Checking dependencies..."
     check_dependencies
 
-    log_info "Step 2/11: Loading configuration..."
-    load_config
-
-    log_info "Step 3/11: Parsing task..."
+    log_info "Step 2/11: Parsing task..."
     parse_task "$TASK_FILE"
+
+    # Phase 1.1: Only load config if task doesn't have project_path
+    if [ -z "$PROJECT_PATH" ]; then
+        log_info "Step 3/11: Loading configuration..."
+        load_config
+    else
+        log_info "Step 3/11: Using project path from task (skipping config load)"
+    fi
 
     log_info "Step 3.5/11: Updating labels to 'in-process'..."
     update_labels_to_processing

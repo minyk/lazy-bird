@@ -98,6 +98,27 @@ The system follows a 6-phase progressive development model:
 - Creates PR if tests pass (with retry logic)
 - Setup: 2-3 hours via wizard, 4-6GB RAM
 
+### Phase 1.1: Multi-Project Support (✅ IMPLEMENTED)
+**Extends Phase 1 to manage multiple projects from a single server.**
+
+- **Single server** monitors 2-20+ projects simultaneously
+- **Projects array** configuration with unique IDs per project
+- **Project-aware** issue watcher with per-project monitoring
+- **Project-specific** commands (test/build/lint) per project
+- **Isolated worktrees** named `feature-project-id-issue-number`
+- **CLI tool** for project management (`project-manager.py`)
+- **Wizard enhancement** with `--add-project` command
+- Setup: Add to existing Phase 1 installation, 6-8GB RAM
+- Use cases: Solo devs with multiple projects, small teams, polyglot development
+
+**Key Benefits:**
+- Manage Godot game + Django backend + Rust CLI from one server
+- Add/remove projects without reconfiguration
+- Per-project issue tracking and state management
+- Full backward compatibility with single-project Phase 1
+
+**See:** `Docs/Design/phase1.1-multi-project.md` for complete specification
+
 ### Phase 2: Multi-Agent with Coordination (Week 2)
 - 2-3 Claude agents run simultaneously
 - Godot Server queues test requests
@@ -759,7 +780,7 @@ MIT License - See LICENSE file
 
 ---
 
-**Last Updated:** 2025-11-06
-**Version:** 2.1 (Phase 1 Complete)
-**Status:** Phase 1 implemented and tested - Production ready!
-**Project Status:** Fully initialized - All core components present
+**Last Updated:** 2025-11-07
+**Version:** 2.2 (Phase 1.1 Complete - Multi-Project Support)
+**Status:** Phase 1.1 implemented and tested - Production ready!
+**Project Status:** Fully initialized - Multi-project support active

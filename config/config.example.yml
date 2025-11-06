@@ -2,88 +2,99 @@
 # Copy to ~/.config/lazy_birtd/config.yml and customize
 
 # ============================================================================
-# PROJECT CONFIGURATION (New in v2.2 - Multi-Framework Support)
+# MULTI-PROJECT CONFIGURATION (New in Phase 1.1)
+# ============================================================================
+# You can now manage multiple projects with a single Lazy_Bird instance!
+# Simply define them in the 'projects' array below.
+#
+# Each project needs:
+#   - id:            Unique identifier (no spaces, alphanumeric with dashes)
+#   - name:          Display name for the project
+#   - type:          Framework type (godot, python, rust, nodejs, django, etc.)
+#   - path:          Absolute path to project directory
+#   - repository:    Git repository URL (GitHub or GitLab)
+#   - git_platform:  Either 'github' or 'gitlab'
+#   - test_command:  Command to run tests
+#   - build_command: Command to build (or null if not needed)
+#   - enabled:       Set to false to temporarily disable a project
+#
+# The issue watcher will monitor all enabled projects automatically!
+
+projects:
+  # Example 1: Godot Game Project
+  - id: "my-platformer"
+    name: "My Platformer Game"
+    type: godot
+    path: /home/yourusername/projects/platformer
+    repository: https://github.com/yourusername/platformer
+    git_platform: github
+    test_command: "godot --headless -s addons/gdUnit4/bin/GdUnitCmdTool.gd --test-suite all"
+    build_command: null
+    lint_command: null
+    format_command: null
+    enabled: true
+
+  # Example 2: Python/Django Web Application
+  - id: "webapp"
+    name: "My Web Application"
+    type: django
+    path: /home/yourusername/projects/webapp
+    repository: https://github.com/yourusername/webapp
+    git_platform: github
+    test_command: "python manage.py test"
+    build_command: null
+    lint_command: "flake8 ."
+    format_command: "black ."
+    enabled: true
+
+  # Example 3: Rust CLI Tool
+  - id: "cli-tool"
+    name: "My CLI Tool"
+    type: rust
+    path: /home/yourusername/projects/cli-tool
+    repository: https://github.com/yourusername/cli-tool
+    git_platform: github
+    test_command: "cargo test --all"
+    build_command: "cargo build --release"
+    lint_command: "cargo clippy"
+    format_command: "cargo fmt"
+    enabled: true
+
+# To add more projects, simply copy one of the examples above and customize.
+# Remove or set enabled: false for projects you don't want to monitor.
+
+# ============================================================================
+# BACKWARD COMPATIBILITY - SINGLE PROJECT MODE (Legacy v2.0-2.1)
+# ============================================================================
+# If you're migrating from an older version, your existing single-project
+# configuration will still work. If both 'projects' array and legacy 'project'
+# exist, the 'projects' array takes precedence.
+#
+# Legacy single-project format (still supported):
+
+# project:
+#   type: godot
+#   name: "My Game Project"
+#   path: /home/yourusername/my-project
+#
+# test_command: "godot --headless -s addons/gdUnit4/bin/GdUnitCmdTool.gd --test-suite all"
+# build_command: null
+# lint_command: null
+# format_command: null
+#
+# git_platform: github
+# repository: https://github.com/yourusername/your-project
+
+# ============================================================================
+# SYSTEM CONFIGURATION
 # ============================================================================
 
-# Project information
-project:
-  # Project type - determines which framework preset to use
-  # Options: godot, python, rust, nodejs, django, flask, fastapi,
-  #          react, vue, angular, unity, unreal, bevy, or custom
-  type: godot
-
-  # Project name (optional, for display purposes)
-  name: "My Game Project"
-
-  # Project path - where your project files are located
-  # For Godot: where project.godot file is
-  # For Python: where requirements.txt or setup.py is
-  # For Rust: where Cargo.toml is
-  # For Node.js: where package.json is
-  path: /home/yourusername/my-project
-
-# ============================================================================
-# FRAMEWORK COMMANDS (Framework-Agnostic)
-# ============================================================================
-
-# Test command - runs your tests
-# Examples by framework:
-#   Godot:   "godot --headless -s addons/gdUnit4/bin/GdUnitCmdTool.gd --test-suite all"
-#   Python:  "pytest tests/ -v"
-#   Rust:    "cargo test --all"
-#   Node.js: "npm test"
-#   Django:  "python manage.py test"
-test_command: "godot --headless -s addons/gdUnit4/bin/GdUnitCmdTool.gd --test-suite all"
-
-# Build command - compiles/builds your project (optional, use null if not needed)
-# Examples by framework:
-#   Godot:   null (no build needed)
-#   Python:  null (no build needed)
-#   Rust:    "cargo build --release"
-#   Node.js: "npm run build"
-build_command: null
-
-# Lint command - checks code style/quality (optional)
-# Examples:
-#   Python:  "flake8 ."
-#   Rust:    "cargo clippy"
-#   Node.js: "npm run lint"
-lint_command: null
-
-# Format command - auto-formats code (optional)
-# Examples:
-#   Python:  "black ."
-#   Rust:    "cargo fmt"
-#   Node.js: "npm run format"
-format_command: null
-
-# ============================================================================
-# GIT CONFIGURATION
-# ============================================================================
-
-# Git Platform (github or gitlab)
-git_platform: github
-
-# Repository URL or path
-# GitHub: https://github.com/owner/repo or owner/repo
-# GitLab: https://gitlab.com/owner/repo or owner/repo
-repository: https://github.com/yourusername/your-project
-
-# GitLab only: Project ID (optional, will be auto-detected if not provided)
-# project_id: 12345678
-
-# Issue polling interval in seconds (default: 60)
+# Issue polling interval in seconds (applies to all projects)
 poll_interval_seconds: 60
-
-# ============================================================================
-# BACKWARD COMPATIBILITY (Legacy Godot Config)
-# ============================================================================
-# For backward compatibility with older configs, you can still use:
-# godot_project_path: /home/yourusername/my-godot-game
-# If both project.path and godot_project_path exist, project.path takes precedence
 
 # Phase configuration (1-6)
 # Phase 1: Single agent, sequential processing
+# Phase 1.1: Multi-project support (current)
 # Phase 2: Multi-agent with coordination
 # Phase 3: Remote access + monitoring
 # Phase 4-6: Advanced features
@@ -135,109 +146,139 @@ retry:
 # ============================================================================
 # FRAMEWORK-SPECIFIC CONFIGURATION EXAMPLES
 # ============================================================================
-# Below are example configurations for different frameworks.
-# Copy the relevant section and customize for your project.
+# Below are more example project configurations for different frameworks.
+# Copy any of these into the 'projects' array above and customize.
 
 # ---------------------------------------------------------------------------
-# Example 1: Godot Game Engine (Default)
+# Unity Game Engine
 # ---------------------------------------------------------------------------
-# project:
-#   type: godot
-#   name: "My Platformer Game"
-#   path: /home/user/my-godot-game
-#
-# test_command: "godot --headless -s addons/gdUnit4/bin/GdUnitCmdTool.gd --test-suite all"
-# build_command: null
-# lint_command: null
-# format_command: null
-
-# ---------------------------------------------------------------------------
-# Example 2: Python with pytest
-# ---------------------------------------------------------------------------
-# project:
-#   type: python
-#   name: "My Python App"
-#   path: /home/user/my-python-app
-#
-# test_command: "pytest tests/ -v --cov"
-# build_command: null
-# lint_command: "flake8 ."
-# format_command: "black ."
-
-# ---------------------------------------------------------------------------
-# Example 3: Django Web Framework
-# ---------------------------------------------------------------------------
-# project:
-#   type: django
-#   name: "My Web App"
-#   path: /home/user/my-webapp
-#
-# test_command: "python manage.py test"
-# build_command: null
-# lint_command: "flake8 ."
-# format_command: "black ."
-
-# ---------------------------------------------------------------------------
-# Example 4: Rust Project
-# ---------------------------------------------------------------------------
-# project:
-#   type: rust
-#   name: "My Rust CLI Tool"
-#   path: /home/user/my-rust-cli
-#
-# test_command: "cargo test --all"
-# build_command: "cargo build --release"
-# lint_command: "cargo clippy"
-# format_command: "cargo fmt"
-
-# ---------------------------------------------------------------------------
-# Example 5: Node.js with Jest
-# ---------------------------------------------------------------------------
-# project:
-#   type: nodejs
-#   name: "My Node.js API"
-#   path: /home/user/my-nodejs-api
-#
-# test_command: "npm test"
-# build_command: "npm run build"
-# lint_command: "npm run lint"
-# format_command: "npm run format"
-
-# ---------------------------------------------------------------------------
-# Example 6: React Frontend
-# ---------------------------------------------------------------------------
-# project:
-#   type: react
-#   name: "My React Dashboard"
-#   path: /home/user/my-react-app
-#
-# test_command: "npm test -- --watchAll=false"
-# build_command: "npm run build"
-# lint_command: "npm run lint"
-# format_command: "npm run format"
-
-# ---------------------------------------------------------------------------
-# Example 7: Unity Game Engine
-# ---------------------------------------------------------------------------
-# project:
-#   type: unity
+# - id: "unity-game"
 #   name: "My Unity Game"
+#   type: unity
 #   path: /home/user/my-unity-game
-#
-# test_command: "unity-editor -runTests -testPlatform EditMode -testResults test-results.xml"
-# build_command: "unity-editor -quit -batchmode -buildTarget StandaloneLinux64"
-# lint_command: null
-# format_command: null
+#   repository: https://github.com/user/unity-game
+#   git_platform: github
+#   test_command: "unity-editor -runTests -testPlatform EditMode -testResults test-results.xml -batchmode -quit"
+#   build_command: "unity-editor -quit -batchmode -buildTarget StandaloneLinux64"
+#   enabled: true
 
 # ---------------------------------------------------------------------------
-# Example 8: Custom Configuration
+# React Frontend Application
 # ---------------------------------------------------------------------------
-# project:
-#   type: custom
+# - id: "react-dashboard"
+#   name: "My React Dashboard"
+#   type: react
+#   path: /home/user/my-react-app
+#   repository: https://github.com/user/react-dashboard
+#   git_platform: github
+#   test_command: "npm test -- --watchAll=false"
+#   build_command: "npm run build"
+#   lint_command: "npm run lint"
+#   format_command: "npm run format"
+#   enabled: true
+
+# ---------------------------------------------------------------------------
+# Flask Python API
+# ---------------------------------------------------------------------------
+# - id: "api-backend"
+#   name: "My Flask API"
+#   type: flask
+#   path: /home/user/my-flask-api
+#   repository: https://github.com/user/flask-api
+#   git_platform: github
+#   test_command: "pytest tests/ -v"
+#   build_command: null
+#   lint_command: "flake8 ."
+#   format_command: "black ."
+#   enabled: true
+
+# ---------------------------------------------------------------------------
+# Node.js Express API
+# ---------------------------------------------------------------------------
+# - id: "express-api"
+#   name: "My Express API"
+#   type: express
+#   path: /home/user/my-express-api
+#   repository: https://github.com/user/express-api
+#   git_platform: github
+#   test_command: "npm test"
+#   build_command: null
+#   lint_command: "npm run lint"
+#   enabled: true
+
+# ---------------------------------------------------------------------------
+# Bevy Game Engine (Rust)
+# ---------------------------------------------------------------------------
+# - id: "bevy-game"
+#   name: "My Bevy Game"
+#   type: bevy
+#   path: /home/user/my-bevy-game
+#   repository: https://github.com/user/bevy-game
+#   git_platform: github
+#   test_command: "cargo test --all"
+#   build_command: "cargo build --release"
+#   lint_command: "cargo clippy"
+#   format_command: "cargo fmt"
+#   enabled: true
+
+# ---------------------------------------------------------------------------
+# FastAPI Python Application
+# ---------------------------------------------------------------------------
+# - id: "fastapi-service"
+#   name: "My FastAPI Service"
+#   type: fastapi
+#   path: /home/user/my-fastapi
+#   repository: https://github.com/user/fastapi-service
+#   git_platform: github
+#   test_command: "pytest tests/ -v"
+#   build_command: null
+#   lint_command: "flake8 ."
+#   format_command: "black ."
+#   enabled: true
+
+# ---------------------------------------------------------------------------
+# GitLab Project Example
+# ---------------------------------------------------------------------------
+# - id: "gitlab-project"
+#   name: "My GitLab Project"
+#   type: python
+#   path: /home/user/my-gitlab-project
+#   repository: https://gitlab.com/user/project
+#   git_platform: gitlab
+#   test_command: "pytest tests/ -v"
+#   build_command: null
+#   enabled: true
+#   # GitLab project ID (optional, auto-detected if not provided)
+#   project_id: 12345678
+
+# ---------------------------------------------------------------------------
+# Custom Project with Custom Commands
+# ---------------------------------------------------------------------------
+# - id: "custom-proj"
 #   name: "My Custom Project"
-#   path: /home/user/my-project
+#   type: custom
+#   path: /home/user/custom-project
+#   repository: https://github.com/user/custom
+#   git_platform: github
+#   test_command: "make test"
+#   build_command: "make build"
+#   lint_command: "make lint"
+#   enabled: true
+
+# ============================================================================
+# TIPS FOR MULTI-PROJECT MANAGEMENT
+# ============================================================================
 #
-# test_command: "make test"
-# build_command: "make build"
-# lint_command: "make lint"
-# format_command: null
+# 1. Project IDs must be unique across all projects
+# 2. Use descriptive IDs (e.g., "web-frontend", "game-server", "cli-tool")
+# 3. Set enabled: false to temporarily disable monitoring a project
+# 4. The issue watcher polls all enabled projects in sequence
+# 5. Each project gets its own isolated git worktree during automation
+# 6. PRs are created in the correct repository automatically
+# 7. Use the project-manager CLI to add/remove projects dynamically:
+#    - lazy-bird projects list
+#    - lazy-bird projects add --id my-app --path /path --type python
+#    - lazy-bird projects remove my-app
+#    - lazy-bird projects disable my-app
+#
+# For more information, see: Docs/Design/phase1.1-multi-project.md

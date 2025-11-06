@@ -25,7 +25,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Multi-Framework](https://img.shields.io/badge/Frameworks-15+-blue.svg)](#-supported-frameworks)
 [![Claude](https://img.shields.io/badge/Claude-Code-purple.svg)](https://claude.ai/code)
-[![Status](https://img.shields.io/badge/Status-Phase%201%20Complete-brightgreen.svg)]()
+[![Status](https://img.shields.io/badge/Status-Phase%201.1%20Complete-brightgreen.svg)]()
 
 [Quick Start](#-quick-start) • [Features](#-features) • [Installation](#-installation) • [Docs](CLAUDE.md) • [Architecture](Docs/Design/)
 
@@ -106,6 +106,7 @@ gh issue create --template task \
 
 - 🤖 **Autonomous Development** - Claude Code works while you're away
 - 🎯 **Multi-Framework Support** - Works with 15+ frameworks out-of-the-box
+- 🗂️ **Multi-Project Management** - Monitor 2-20+ projects from a single server
 - 🧪 **Automated Testing** - Runs framework tests, retries on failure
 - 🌿 **Safe Git Workflow** - Isolated worktrees, automatic PRs
 - 📊 **Progress Monitoring** - Check status from phone via notifications
@@ -128,6 +129,13 @@ Go to work              Creates PRs if passing     Back to work        Plan tomo
 - One task at a time, sequential processing
 - 15-minute wizard setup, 8GB RAM
 - Perfect for solo developers
+
+**Phase 1.1: Multi-Project** (✅ Current)
+- Single server manages 2-20+ projects simultaneously
+- Add/remove/edit projects via CLI or wizard
+- Per-project configuration (test/build/lint commands)
+- Sequential processing across all projects
+- 8-10GB RAM recommended
 
 **Phase 2: Multi-Agent** (Scale up)
 - 2-3 agents working in parallel
@@ -240,6 +248,37 @@ journalctl -u godot-server -f
 ./wizard.sh --weekly-review   # Progress report
 ```
 
+### Managing Multiple Projects (Phase 1.1+)
+
+```bash
+# List all configured projects
+python3 scripts/project-manager.py list
+
+# Add a new project to existing setup
+./wizard.sh --add-project
+# Or use CLI directly:
+python3 scripts/project-manager.py add \
+  --id "my-backend" \
+  --name "My Backend API" \
+  --type python \
+  --path /path/to/backend \
+  --repository https://github.com/user/backend \
+  --test-command "pytest tests/"
+
+# Show details for a specific project
+python3 scripts/project-manager.py show --id "my-backend"
+
+# Enable/disable a project
+python3 scripts/project-manager.py enable --id "my-backend"
+python3 scripts/project-manager.py disable --id "my-backend"
+
+# Remove a project
+python3 scripts/project-manager.py remove --id "my-backend"
+
+# After adding/removing projects, restart services
+systemctl --user restart issue-watcher
+```
+
 ## 📋 Example Workflows
 
 ### Game Developer (Godot)
@@ -311,6 +350,54 @@ gh pr review 67 --approve
 # Check preview, merge to production
 ```
 
+### Multi-Project Developer (Phase 1.1+)
+
+**Scenario:** Managing a game, backend, and frontend simultaneously
+
+```bash
+# Initial setup - configure 3 projects
+./wizard.sh
+# → Configure: my-game (Godot)
+# → Add project: my-backend (Django)
+# → Add project: my-frontend (React)
+
+# Verify all projects configured
+python3 scripts/project-manager.py list
+# Shows:
+# 1. [my-game] My Game (godot) - ✅ ENABLED
+# 2. [my-backend] My Backend API (python) - ✅ ENABLED
+# 3. [my-frontend] My Frontend (react) - ✅ ENABLED
+
+# Morning - create issues across all projects
+gh issue create --repo user/my-game --template task --title "Add boss fight" --label "ready"
+gh issue create --repo user/my-backend --template task --title "Add WebSocket support" --label "ready"
+gh issue create --repo user/my-frontend --template task --title "Add real-time notifications" --label "ready"
+
+# → Issue watcher polls all 3 repositories
+# → Creates tasks with project-specific context
+# → Uses project-specific test commands:
+#   - Godot: gdUnit4 tests
+#   - Django: pytest tests/
+#   - React: npm test
+
+# Lunch - review PRs from all projects
+gh pr list --repo user/my-game
+gh pr list --repo user/my-backend
+gh pr list --repo user/my-frontend
+
+# Approve and merge
+gh pr review 42 --repo user/my-game --approve
+gh pr review 89 --repo user/my-backend --approve
+gh pr review 15 --repo user/my-frontend --approve
+
+# Later - add a new project
+./wizard.sh --add-project
+# → Configure: my-mobile (react-native)
+systemctl --user restart issue-watcher
+
+# Now monitoring 4 projects!
+```
+
 ## Project Structure
 
 ```
@@ -319,7 +406,9 @@ lazy_birtd/
 ├── scripts/
 │   ├── godot-server.py      # Test coordination server
 │   ├── issue-watcher.py     # GitHub/GitLab issue monitor
-│   └── agent-runner.sh      # Claude Code agent launcher
+│   ├── agent-runner.sh      # Claude Code agent launcher
+│   ├── project-manager.py   # Multi-project CLI tool (Phase 1.1+)
+│   └── wizard-multi-project.sh  # Multi-project wizard functions
 ├── tests/
 │   └── phase0/              # Validation tests
 ├── Docs/
@@ -330,7 +419,7 @@ lazy_birtd/
 
 Configuration:
 ~/.config/lazy_birtd/
-├── config.yml              # Main config
+├── config.yml              # Main config (supports projects array)
 ├── secrets/                # API tokens (chmod 700)
 └── logs/                   # All logs
 ```
@@ -339,6 +428,7 @@ Configuration:
 
 - **[CLAUDE.md](CLAUDE.md)** - Complete guide for developers
 - **[Docs/Design/](Docs/Design/)** - Detailed specifications
+  - `phase1.1-multi-project.md` - Multi-project architecture (Phase 1.1)
   - `wizard-complete-spec.md` - Wizard architecture
   - `godot-server-spec.md` - Test coordination
   - `claude-cli-reference.md` - Correct CLI commands
@@ -463,7 +553,7 @@ A: Tests catch most issues. Changes are in isolated worktrees and PRs for review
 
 ## Roadmap
 
-**Current Status:** Phase 1 Complete - Production Ready! 🎉
+**Current Status:** Phase 1.1 Complete - Multi-Project Support! 🎉
 
 **Phase 0 (Complete):**
 - ✅ Complete specification
@@ -476,6 +566,14 @@ A: Tests catch most issues. Changes are in isolated worktrees and PRs for review
 - ✅ Issue watcher (issue-watcher.py with label workflow)
 - ✅ Systemd service integration
 - ✅ Status and health monitoring (--status, --health commands)
+
+**Phase 1.1 (Complete - NEW!):**
+- ✅ Multi-project configuration schema (projects array)
+- ✅ Project-aware issue watcher with per-project monitoring
+- ✅ Project-specific task execution (test/build/lint commands)
+- ✅ CLI project management tool (project-manager.py)
+- ✅ Wizard enhancement with --add-project command
+- ✅ Comprehensive testing (26/26 tests passed)
 
 **Phase 2 (Week 2-3):**
 - Multi-agent scheduler
@@ -525,6 +623,6 @@ MIT License - see [LICENSE](LICENSE) file.
     🦜 Fly lazy, code smart
 ```
 
-**Status:** Phase 1 Complete ✅ | Multi-Framework Support ✅ | Production Ready | Start Automating Today!
+**Status:** Phase 1.1 Complete ✅ | Multi-Project Support ✅ | Multi-Framework Support ✅ | Production Ready | Start Automating Today!
 
 </div>

@@ -160,9 +160,16 @@ glab issue create \\
 
 Continuously monitors GitHub/GitLab for new issues with the `ready` label and queues them for processing.
 
+**Phase 1.1:** Supports monitoring multiple projects simultaneously. Each project is polled sequentially, with per-project issue detection and task creation.
+
 ### Implementation
 
 **Service:** `scripts/issue-watcher.py`
+
+**Architecture (Phase 1.1):**
+- **IssueWatcher class**: Orchestrates monitoring of multiple projects
+- **ProjectWatcher class**: Monitors a single project's repository
+- **Sequential polling**: Each project polled in order (foundation for Phase 2 parallelism)
 
 ```python
 #!/usr/bin/env python3
@@ -428,6 +435,7 @@ journalctl -u issue-watcher -f
 
 ### Task File Format
 
+**Phase 1 (Single Project):**
 ```json
 {
   "issue_id": 42,
@@ -443,6 +451,159 @@ journalctl -u issue-watcher -f
   "queued_at": "2025-11-01T07:30:00Z",
   "priority": "normal"
 }
+```
+
+**Phase 1.1 (Multi-Project) - Includes Project Context:**
+```json
+{
+  "issue_id": 42,
+  "title": "Add player health system",
+  "body": "## Task Description\\nAdd health to player...\\n",
+  "steps": [
+    "1. Create res://player/health.gd",
+    "2. Add Health class with properties",
+    "3. Implement take_damage method"
+  ],
+  "complexity": "medium",
+  "url": "https://github.com/user/my-game/issues/42",
+  "queued_at": "2025-11-01T07:30:00Z",
+  "priority": "normal",
+
+  "_comment": "Phase 1.1: Project-specific context",
+  "project_id": "my-game",
+  "project_name": "My Platformer Game",
+  "project_type": "godot",
+  "project_path": "/home/user/projects/platformer",
+  "repository": "https://github.com/user/my-game",
+  "git_platform": "github",
+  "test_command": "godot --headless -s addons/gdUnit4/bin/GdUnitCmdTool.gd --test-suite all",
+  "build_command": null,
+  "lint_command": null
+}
+```
+
+**Key Changes in Phase 1.1:**
+- `project_id`: Unique identifier for the project
+- `project_name`: Display name
+- `project_type`: Framework type (godot, python, rust, etc.)
+- `project_path`: Absolute path to project directory
+- `repository`: Full repository URL
+- `test_command`, `build_command`, `lint_command`: Project-specific commands
+
+## Multi-Project Workflow (Phase 1.1+)
+
+### Monitoring Multiple Repositories
+
+When configured with multiple projects, the issue watcher monitors each project's repository independently:
+
+```
+┌─────────────────────────────────────────────────────┐
+│          Issue Watcher (Phase 1.1)                  │
+│                                                     │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────┐ │
+│  │ ProjectWatch │  │ ProjectWatch │  │  Project │ │
+│  │  (my-game)   │  │ (my-backend) │  │  Watch   │ │
+│  │   github.com │  │   github.com │  │(frontend)│ │
+│  │   /user/game │  │  /user/backend│  │github.com│ │
+│  └──────┬───────┘  └──────┬───────┘  └────┬─────┘ │
+│         │                 │                │       │
+└─────────┼─────────────────┼────────────────┼───────┘
+          │                 │                │
+          ▼                 ▼                ▼
+    Poll every 60s      Poll every 60s    Poll every 60s
+    Issues with         Issues with        Issues with
+    'ready' label       'ready' label      'ready' label
+          │                 │                │
+          └─────────────────┴────────────────┘
+                           │
+                           ▼
+                 Task Queue (/var/lib/lazy_birtd/queue/)
+                 task-my-game-42.json
+                 task-my-backend-15.json
+                 task-my-frontend-89.json
+```
+
+### Creating Issues Across Projects
+
+**Example Morning Routine:**
+```bash
+# Create task for game (Godot)
+gh issue create --repo user/my-game --template task \
+  --title "Add boss fight mechanics" \
+  --label "ready,gameplay,medium"
+
+# Create task for backend (Python/Django)
+gh issue create --repo user/my-backend --template task \
+  --title "Add WebSocket support for real-time events" \
+  --label "ready,feature,medium"
+
+# Create task for frontend (React)
+gh issue create --repo user/my-frontend --template task \
+  --title "Add real-time notification component" \
+  --label "ready,feature,simple"
+```
+
+### Project-Aware Processing
+
+Each task includes full project context, so the agent runner knows:
+- Which repository to work on (`project_path`)
+- Which test command to run (`test_command`)
+- Which framework tools are available (`project_type`)
+- Where to create the worktree (`feature-{project_id}-{issue_id}`)
+
+**Task Queue Files:**
+```bash
+/var/lib/lazy_birtd/queue/
+├── task-my-game-42.json          # project_id: my-game
+├── task-my-backend-15.json       # project_id: my-backend
+└── task-my-frontend-89.json      # project_id: my-frontend
+```
+
+**Worktree Isolation:**
+```bash
+/tmp/lazy-bird-agent-my-game-42/       # Game task worktree
+/tmp/lazy-bird-agent-my-backend-15/    # Backend task worktree
+/tmp/lazy-bird-agent-my-frontend-89/   # Frontend task worktree
+```
+
+### Multi-Project Logs
+
+Issue watcher logs show per-project activity with `[project-id]` prefix:
+
+```
+2025-11-07 09:00:01 - INFO - [my-game] Polling for issues...
+2025-11-07 09:00:02 - INFO - [my-game] Found issue #42: Add boss fight mechanics
+2025-11-07 09:00:03 - INFO - [my-game] Creating task: task-my-game-42.json
+2025-11-07 09:00:10 - INFO - [my-backend] Polling for issues...
+2025-11-07 09:00:11 - INFO - [my-backend] Found issue #15: Add WebSocket support
+2025-11-07 09:00:12 - INFO - [my-backend] Creating task: task-my-backend-15.json
+2025-11-07 09:00:20 - INFO - [my-frontend] Polling for issues...
+2025-11-07 09:00:21 - INFO - [my-frontend] No new issues
+```
+
+**Monitor with:**
+```bash
+journalctl --user -u issue-watcher -f | grep "\[my-game\]"
+journalctl --user -u issue-watcher -f | grep "\[my-backend\]"
+```
+
+### Managing Projects
+
+**List all configured projects:**
+```bash
+python3 scripts/project-manager.py list
+```
+
+**Temporarily disable a project:**
+```bash
+python3 scripts/project-manager.py disable --id "my-frontend"
+systemctl --user restart issue-watcher
+```
+
+**Re-enable:**
+```bash
+python3 scripts/project-manager.py enable --id "my-frontend"
+systemctl --user restart issue-watcher
 ```
 
 ## Processing Workflow

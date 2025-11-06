@@ -261,6 +261,221 @@ journalctl --user -u issue-watcher -f
 
 ---
 
+## 🗂️ Phase 1.1: Multi-Project Support (30 min with wizard, 1 hour manual)
+
+**✅ CURRENT PHASE - Fully Implemented and Tested**
+
+### Why Phase 1.1?
+After using Phase 1 for a week, you might want to automate multiple projects:
+- Game + Backend + Frontend
+- Multiple games with shared automation
+- Work project + Side projects
+- Main repo + Plugin repos
+
+### What Phase 1.1 Adds
+- **Single server** manages 2-20+ projects simultaneously
+- **Projects array** in config with unique project IDs
+- **Per-project configuration** (test/build/lint commands)
+- **CLI tool** for add/remove/edit/list projects
+- **Sequential processing** across all projects (foundation for Phase 2)
+- **Backward compatibility** - legacy single-project configs still work
+
+### Prerequisites
+- ✅ Phase 1 working successfully for at least a few days
+- ✅ Comfortable with the workflow
+- ✅ Have 2+ projects to automate
+
+### Option A: Wizard (Recommended - 15 min)
+```bash
+# Add a new project to existing setup
+./wizard.sh --add-project
+
+# The wizard will ask:
+# 1. Project ID (e.g., "my-backend")
+# 2. Project name (e.g., "My Backend API")
+# 3. Project type (python, godot, rust, etc.)
+# 4. Project path
+# 5. Repository URL
+# 6. Git platform (GitHub/GitLab)
+# 7. Test command (or use preset)
+
+# Restart services to apply changes
+systemctl --user restart issue-watcher
+```
+
+### Option B: Manual Setup with CLI
+```bash
+# List currently configured projects
+python3 scripts/project-manager.py list
+
+# Add a new project
+python3 scripts/project-manager.py add \
+  --id "my-backend" \
+  --name "My Backend API" \
+  --type python \
+  --path /home/user/projects/backend \
+  --repository https://github.com/user/backend \
+  --git-platform github \
+  --test-command "pytest tests/" \
+  --lint-command "flake8 ."
+
+# Show project details
+python3 scripts/project-manager.py show --id "my-backend"
+
+# Enable/disable projects
+python3 scripts/project-manager.py disable --id "my-backend"
+python3 scripts/project-manager.py enable --id "my-backend"
+
+# Remove a project
+python3 scripts/project-manager.py remove --id "my-backend"
+
+# Restart issue-watcher to apply changes
+systemctl --user restart issue-watcher
+```
+
+### Option C: Edit config.yml Directly
+```yaml
+# ~/.config/lazy_birtd/config.yml
+projects:
+  # Project 1: Game (Godot)
+  - id: "my-game"
+    name: "My Platformer Game"
+    type: godot
+    path: /home/user/projects/platformer
+    repository: https://github.com/user/platformer
+    git_platform: github
+    test_command: "godot --headless -s addons/gdUnit4/bin/GdUnitCmdTool.gd --test-suite all"
+    build_command: null
+    lint_command: null
+    format_command: null
+    enabled: true
+
+  # Project 2: Backend (Python)
+  - id: "my-backend"
+    name: "Game Backend API"
+    type: python
+    path: /home/user/projects/backend
+    repository: https://github.com/user/backend
+    git_platform: github
+    test_command: "pytest tests/"
+    build_command: null
+    lint_command: "flake8 ."
+    format_command: "black ."
+    enabled: true
+
+  # Project 3: Frontend (React)
+  - id: "my-frontend"
+    name: "Game Frontend"
+    type: react
+    path: /home/user/projects/frontend
+    repository: https://github.com/user/frontend
+    git_platform: github
+    test_command: "npm test"
+    build_command: "npm run build"
+    lint_command: "npm run lint"
+    format_command: null
+    enabled: true
+
+# Rest of config stays the same...
+poll_interval_seconds: 60
+phase: 1
+max_concurrent_agents: 1
+```
+
+### How It Works
+```
+┌─────────────────────────────────────────────────────┐
+│          Issue Watcher (Phase 1.1)                  │
+│                                                     │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────┐ │
+│  │ ProjectWatch │  │ ProjectWatch │  │  Project │ │
+│  │   (game)     │  │  (backend)   │  │  Watch   │ │
+│  │              │  │              │  │(frontend)│ │
+│  └──────┬───────┘  └──────┬───────┘  └────┬─────┘ │
+│         │                 │                │       │
+└─────────┼─────────────────┼────────────────┼───────┘
+          │                 │                │
+          ▼                 ▼                ▼
+    GitHub Issues     GitHub Issues    GitHub Issues
+    (repo: game)     (repo: backend)  (repo: frontend)
+          │                 │                │
+          └─────────────────┴────────────────┘
+                           │
+                           ▼
+                   Task Queue (JSON)
+                           │
+                           ▼
+                   Agent Runner
+                (uses project-specific
+                 commands & worktrees)
+```
+
+### Multi-Project Workflow Example
+```bash
+# Morning - Create issues across all 3 projects
+gh issue create --repo user/game --template task \
+  --title "Add boss fight mechanics" --label "ready"
+
+gh issue create --repo user/backend --template task \
+  --title "Add WebSocket support" --label "ready"
+
+gh issue create --repo user/frontend --template task \
+  --title "Add real-time notifications" --label "ready"
+
+# Issue watcher polls all 3 repos
+# Creates 3 tasks with project-specific context
+# Each task uses correct test commands:
+#   - game: gdUnit4
+#   - backend: pytest
+#   - frontend: npm test
+
+# Lunch - Review PRs from all projects
+gh pr list --repo user/game
+gh pr list --repo user/backend
+gh pr list --repo user/frontend
+
+# Approve and merge as usual
+```
+
+### Monitoring Multiple Projects
+```bash
+# View all configured projects
+python3 scripts/project-manager.py list
+# Output:
+# 1. [my-game] My Platformer Game (godot) - ✅ ENABLED
+# 2. [my-backend] Game Backend API (python) - ✅ ENABLED
+# 3. [my-frontend] Game Frontend (react) - ✅ ENABLED
+
+# Check issue-watcher logs (shows per-project activity)
+journalctl --user -u issue-watcher -f
+# You'll see logs like:
+# [my-game] Polling for issues...
+# [my-backend] Found issue #42: Add WebSocket support
+# [my-frontend] Creating task for issue #15
+
+# System status
+./wizard.sh --status
+```
+
+### Success Criteria
+- [ ] 2+ projects configured and enabled
+- [ ] issue-watcher monitors all project repositories
+- [ ] Tasks from any project get processed correctly
+- [ ] Each project uses its own test/build/lint commands
+- [ ] Worktrees named with project-id: `feature-project-id-issue-number`
+- [ ] You're automating multiple codebases simultaneously
+
+### Performance Notes
+- Sequential polling: Projects polled one at a time (Phase 1 foundation)
+- RAM usage: Minimal increase (~500MB per project for monitoring)
+- Poll interval: 60s default, applies to all projects sequentially
+- Concurrent agents: Still 1 (multi-agent parallelism comes in Phase 2)
+
+### Documentation
+**See:** `Docs/Design/phase1.1-multi-project.md` for complete technical specification
+
+---
+
 ## 📈 Phase 2: Next Weekend (Git Isolation)
 
 ### Prerequisites Complete
