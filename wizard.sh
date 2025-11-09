@@ -193,8 +193,8 @@ main() {
     fi
 
     # Detect Claude Code CLI
-    if command -v claude &> /dev/null; then
-        CLAUDE_VERSION=$(claude --version 2>&1 || echo "installed")
+    if command -v gemini &> /dev/null; then
+        CLAUDE_VERSION=$(gemini --version 2>&1 || echo "installed")
         success "Claude Code CLI found: $CLAUDE_VERSION"
     else
         error "Claude Code CLI not found"
@@ -237,7 +237,7 @@ main() {
         SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
         # Check if Phase 0 validation script exists
-        if [ -f "$SCRIPT_DIR/scripts/validate-claude.sh" ]; then
+        if [ -f "$SCRIPT_DIR/scripts/validate-gemini.sh" ]; then
             # We need a project path for validation
             read -p "Enter path to test Godot project for validation: " TEST_PROJECT
             TEST_PROJECT="${TEST_PROJECT/#\~/$HOME}"
@@ -246,7 +246,7 @@ main() {
                 warning "Test project not found, skipping Phase 0 validation"
             else
                 info "Running Phase 0 validation..."
-                if "$SCRIPT_DIR/scripts/validate-claude.sh"; then
+                if "$SCRIPT_DIR/scripts/validate-gemini.sh"; then
                     success "Phase 0 validation passed!"
                 else
                     error "Phase 0 validation failed"
@@ -768,7 +768,7 @@ cmd_health() {
 
     # Check 6: Claude CLI
     echo -n "Claude Code CLI... "
-    if command -v claude &>/dev/null; then
+    if command -v gemini &>/dev/null; then
         echo -e "${GREEN}✓${NC}"
         ((CHECKS_PASSED++))
     else

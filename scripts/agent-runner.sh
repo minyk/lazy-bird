@@ -59,8 +59,8 @@ log_error() {
 check_dependencies() {
     local missing_deps=()
 
-    if ! command -v claude &> /dev/null; then
-        missing_deps+=("claude (Claude Code CLI)")
+    if ! command -v gemini &> /dev/null; then
+        missing_deps+=("gemini (Claude Code CLI)")
     fi
 
     if ! command -v git &> /dev/null; then
@@ -276,8 +276,8 @@ Work in the current directory: $WORKTREE_PATH
     # Don't use --dangerously-skip-permissions unless in container
     log_info "[$PROJECT_ID] Executing Claude Code CLI..."
 
-    if claude -p "$CLAUDE_PROMPT" \
-        --allowedTools "Read,Write,Edit,Glob,Grep,Bash(git:*)" \
+    if gemini -p "$CLAUDE_PROMPT" \
+        --allowedTools "Read,Write,Edit,Glob,Grep,Bash(git:*)" --yolo \
         2>&1 | tee -a "$LOG_FILE"; then
 
         CLAUDE_EXIT=0
@@ -506,7 +506,7 @@ https://github.com/yusufkaraaslan/lazy-bird"
     if gh pr create \
         --title "[$PROJECT_ID] Task #$TASK_ID: $TASK_TITLE" \
         --body "$PR_BODY" \
-        --base main \
+        --base master \
         --head "$BRANCH_NAME" \
         --label "automated"; then
 
